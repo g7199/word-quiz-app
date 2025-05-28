@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, BookOpen, Star, Calendar, Globe, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, BookOpen, Star, Calendar, Globe, FileText, List, CreditCard, Eye, EyeOff } from 'lucide-react';
 import Papa from 'papaparse';
 
 const WordQuizApp = () => {
@@ -13,6 +13,8 @@ const WordQuizApp = () => {
   const [totalDays, setTotalDays] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
+  const [hiddenAnswers, setHiddenAnswers] = useState(new Set());
 
   // CSV 파일 로드
   useEffect(() => {
@@ -156,6 +158,7 @@ const WordQuizApp = () => {
     setCurrentIndex(0);
     setIsFlipped(false);
     setShowConfusing(false);
+    setHiddenAnswers(new Set());
   };
 
   // 헷갈리는 단어 모드 토글
@@ -163,6 +166,27 @@ const WordQuizApp = () => {
     setShowConfusing(!showConfusing);
     setCurrentIndex(0);
     setIsFlipped(false);
+    setHiddenAnswers(new Set());
+  };
+
+  // 답 숨기기/보이기 토글
+  const toggleAnswer = (index) => {
+    const newHidden = new Set(hiddenAnswers);
+    if (newHidden.has(index)) {
+      newHidden.delete(index);
+    } else {
+      newHidden.add(index);
+    }
+    setHiddenAnswers(newHidden);
+  };
+
+  // 모든 답 숨기기/보이기
+  const toggleAllAnswers = () => {
+    if (hiddenAnswers.size === currentWords.length) {
+      setHiddenAnswers(new Set());
+    } else {
+      setHiddenAnswers(new Set(Array.from({length: currentWords.length}, (_, i) => i)));
+    }
   };
 
   if (isLoading) {
@@ -231,6 +255,21 @@ const WordQuizApp = () => {
               </button>
             </div>
 
+            {/* 보기 모드 선택 */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'list' 
+                    ? 'bg-green-600 text-white hover:bg-green-700' 
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {viewMode === 'card' ? <List className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                {viewMode === 'card' ? '외우기 모드' : '카드 모드'}
+              </button>
+            </div>
+
             {/* 헷갈리는 단어 모드 */}
             <button
               onClick={toggleConfusingMode}
@@ -246,106 +285,177 @@ const WordQuizApp = () => {
           </div>
         </div>
 
-        {/* 진행률 */}
-        <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              {showConfusing ? '헷갈리는 단어' : `${currentDay}일차`} 진행률
-            </span>
-            <span className="text-sm text-gray-500">
-              {currentIndex + 1} / {currentWords.length}
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-              style={{width: `${((currentIndex + 1) / currentWords.length) * 100}%`}}
-            ></div>
-          </div>
-        </div>
-
-        {/* 메인 카드 */}
-        {currentWords.length > 0 ? (
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-            <div 
-              className="relative h-64 cursor-pointer group"
-              onClick={flipCard}
-            >
-              <div className={`absolute inset-0 transition-transform duration-500 transform-style-preserve-3d ${
-                isFlipped ? 'rotate-y-180' : ''
-              }`}>
-                {/* 앞면 */}
-                <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold mb-2">
-                      {mode === 'ko-to-en' ? korean : english}
-                    </p>
-                    <p className="text-indigo-200 text-sm">클릭해서 뒤집기</p>
-                  </div>
-                </div>
-                
-                {/* 뒷면 */}
-                <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center text-white">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold mb-2">
-                      {mode === 'ko-to-en' ? english : korean}
-                    </p>
-                    <p className="text-emerald-200 text-sm">다시 클릭해서 뒤집기</p>
-                  </div>
-                </div>
-              </div>
+        {/* 진행률 - 카드 모드일 때만 표시 */}
+        {viewMode === 'card' && (
+          <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-medium text-gray-700">
+                {showConfusing ? '헷갈리는 단어' : `${currentDay}일차`} 진행률
+              </span>
+              <span className="text-sm text-gray-500">
+                {currentIndex + 1} / {currentWords.length}
+              </span>
             </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-6 text-center">
-            <p className="text-gray-500">단어가 없습니다.</p>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
+                style={{width: `${((currentIndex + 1) / currentWords.length) * 100}%`}}
+              ></div>
+            </div>
           </div>
         )}
 
-        {/* 컨트롤 버튼 */}
-        <div className="flex justify-center items-center gap-4 mb-6">
-          <button
-            onClick={prevWord}
-            disabled={currentIndex === 0}
-            className="p-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronLeft className="h-6 w-6 text-gray-600" />
-          </button>
+        {/* 외우기 모드 컨트롤 */}
+        {viewMode === 'list' && currentWords.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">
+                {showConfusing ? '헷갈리는 단어' : `${currentDay}일차`} - 총 {currentWords.length}개
+              </span>
+              <button
+                onClick={toggleAllAnswers}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors text-sm"
+              >
+                {hiddenAnswers.size === currentWords.length ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                {hiddenAnswers.size === currentWords.length ? '모두 보기' : '모두 가리기'}
+              </button>
+            </div>
+          </div>
+        )}
 
-          <button
-            onClick={flipCard}
-            className="p-3 bg-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:bg-indigo-700 transition-all"
-          >
-            <RotateCcw className="h-6 w-6" />
-          </button>
+        {/* 메인 컨텐츠 */}
+        {viewMode === 'card' ? (
+          // 카드 모드
+          <>
+            {currentWords.length > 0 ? (
+              <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+                <div 
+                  className="relative h-64 cursor-pointer group"
+                  onClick={flipCard}
+                >
+                  <div className={`absolute inset-0 transition-transform duration-500 transform-style-preserve-3d ${
+                    isFlipped ? 'rotate-y-180' : ''
+                  }`}>
+                    {/* 앞면 */}
+                    <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
+                      <div className="text-center">
+                        <p className="text-3xl font-bold mb-2">
+                          {mode === 'ko-to-en' ? korean : english}
+                        </p>
+                        <p className="text-indigo-200 text-sm">클릭해서 뒤집기</p>
+                      </div>
+                    </div>
+                    
+                    {/* 뒷면 */}
+                    <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center text-white">
+                      <div className="text-center">
+                        <p className="text-3xl font-bold mb-2">
+                          {mode === 'ko-to-en' ? english : korean}
+                        </p>
+                        <p className="text-emerald-200 text-sm">다시 클릭해서 뒤집기</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-xl p-8 mb-6 text-center">
+                <p className="text-gray-500">단어가 없습니다.</p>
+              </div>
+            )}
 
-          <button
-            onClick={nextWord}
-            disabled={currentIndex === currentWords.length - 1}
-            className="p-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ChevronRight className="h-6 w-6 text-gray-600" />
-          </button>
-        </div>
+            {/* 카드 모드 컨트롤 버튼 */}
+            <div className="flex justify-center items-center gap-4 mb-6">
+              <button
+                onClick={prevWord}
+                disabled={currentIndex === 0}
+                className="p-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-6 w-6 text-gray-600" />
+              </button>
+
+              <button
+                onClick={flipCard}
+                className="p-3 bg-indigo-600 text-white rounded-full shadow-lg hover:shadow-xl hover:bg-indigo-700 transition-all"
+              >
+                <RotateCcw className="h-6 w-6" />
+              </button>
+
+              <button
+                onClick={nextWord}
+                disabled={currentIndex === currentWords.length - 1}
+                className="p-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-6 w-6 text-gray-600" />
+              </button>
+            </div>
+          </>
+        ) : (
+          // 외우기 모드 (리스트)
+          <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            {currentWords.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {currentWords.map((word, index) => {
+                  const keys = Object.keys(word);
+                  const koreanWord = word[keys[0]] || '';
+                  const englishWord = word[keys[1]] || '';
+                  const isHidden = hiddenAnswers.has(index);
+                  
+                  return (
+                    <div 
+                      key={index} 
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => toggleAnswer(index)}
+                    >
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-gray-800 mb-2">
+                          {mode === 'ko-to-en' ? koreanWord : englishWord}
+                        </div>
+                        <div className="text-gray-600">
+                          {isHidden ? (
+                            <div className="bg-gray-200 text-gray-400 py-2 px-4 rounded flex items-center justify-center gap-2">
+                              <EyeOff className="h-4 w-4" />
+                              클릭해서 보기
+                            </div>
+                          ) : (
+                            <div className="font-medium text-indigo-600">
+                              {mode === 'ko-to-en' ? englishWord : koreanWord}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">단어가 없습니다.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 액션 버튼 */}
-        <div className="flex justify-center gap-4">
-          {showConfusing ? (
-            <button
-              onClick={removeFromConfusing}
-              className="bg-red-500 text-white px-6 py-3 rounded-xl hover:bg-red-600 transition-colors shadow-lg"
-            >
-              이 단어 제거하기
-            </button>
-          ) : (
-            <button
-              onClick={addToConfusing}
-              className="bg-yellow-500 text-white px-6 py-3 rounded-xl hover:bg-yellow-600 transition-colors shadow-lg"
-            >
-              헷갈리는 단어에 추가
-            </button>
-          )}
-        </div>
+        {viewMode === 'card' && (
+          <div className="flex justify-center gap-4">
+            {showConfusing ? (
+              <button
+                onClick={removeFromConfusing}
+                className="bg-red-500 text-white px-6 py-3 rounded-xl hover:bg-red-600 transition-colors shadow-lg"
+              >
+                이 단어 제거하기
+              </button>
+            ) : (
+              <button
+                onClick={addToConfusing}
+                className="bg-yellow-500 text-white px-6 py-3 rounded-xl hover:bg-yellow-600 transition-colors shadow-lg"
+              >
+                헷갈리는 단어에 추가
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 커스텀 CSS */}
