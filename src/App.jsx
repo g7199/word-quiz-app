@@ -112,6 +112,7 @@ const WordQuizApp = () => {
   // 다음 단어
   const nextWord = () => {
     if (currentIndex < currentWords.length - 1) {
+      setIsFlipped(false);
       setCurrentIndex(currentIndex + 1);
 
     }
@@ -120,6 +121,7 @@ const WordQuizApp = () => {
   // 이전 단어
   const prevWord = () => {
     if (currentIndex > 0) {
+      setIsFlipped(false);
       setCurrentIndex(currentIndex - 1);
     }
   };
@@ -331,6 +333,7 @@ const WordQuizApp = () => {
                 <div 
                   className="relative h-64 cursor-pointer group"
                   onClick={flipCard}
+                  key={`${currentIndex}-${currentDay}-${showConfusing}`}
                 >
                   <div className={`absolute inset-0 transition-transform duration-500 transform-style-preserve-3d ${
                     isFlipped ? 'rotate-y-180' : ''
