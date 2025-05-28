@@ -333,7 +333,6 @@ const WordQuizApp = () => {
                 <div 
                   className="relative h-64 cursor-pointer group"
                   onClick={flipCard}
-                  key={`${currentIndex}-${currentDay}-${showConfusing}`}
                 >
                   <div className={`absolute inset-0 transition-transform duration-500 transform-style-preserve-3d ${
                     isFlipped ? 'rotate-y-180' : ''
