@@ -112,7 +112,6 @@ const WordQuizApp = () => {
   // 다음 단어
   const nextWord = () => {
     if (currentIndex < currentWords.length - 1) {
-      setIsFlipped(false);
       setCurrentIndex(currentIndex + 1);
 
     }
@@ -121,7 +120,6 @@ const WordQuizApp = () => {
   // 이전 단어
   const prevWord = () => {
     if (currentIndex > 0) {
-      setIsFlipped(false);
       setCurrentIndex(currentIndex - 1);
     }
   };
