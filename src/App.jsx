@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, BookOpen, Star, Calendar, Globe, FileText, List, CreditCard, Eye, EyeOff } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw,
+  BookOpen,
+  Star,
+  Calendar,
+  Globe,
+  FileText,
+  List,
+  CreditCard,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import Papa from 'papaparse';
 
 const WordQuizApp = () => {
@@ -16,14 +29,24 @@ const WordQuizApp = () => {
   const [viewMode, setViewMode] = useState('card'); // 'card' or 'list'
   const [hiddenAnswers, setHiddenAnswers] = useState(new Set());
 
-  // CSV 파일 로드
+  /* -------------------------- 유틸리티 -------------------------- */
+  const shuffleArray = (array) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
+  /* -------------------------- CSV 파일 로드 -------------------------- */
   useEffect(() => {
     const loadCSV = async () => {
       try {
         setIsLoading(true);
         const response = await fetch('/word.csv');
         const data = await response.text();
-        
+
         Papa.parse(data, {
           header: true,
           skipEmptyLines: true,
@@ -33,15 +56,20 @@ const WordQuizApp = () => {
             if (results.errors.length > 0) {
               console.warn('CSV parsing warnings:', results.errors);
             }
-            
+
             // 헤더 정리 및 데이터 처리
             const cleanedData = results.data
-              .filter(row => row && Object.values(row).some(val => val !== null && val !== ''))
-              .map(row => {
+              .filter(
+                (row) =>
+                  row &&
+                  Object.values(row).some((val) => val !== null && val !== '')
+              )
+              .map((row) => {
                 const cleanedRow = {};
-                Object.keys(row).forEach(key => {
+                Object.keys(row).forEach((key) => {
                   const cleanKey = key.trim();
-                  cleanedRow[cleanKey] = typeof row[key] === 'string' ? row[key].trim() : row[key];
+                  cleanedRow[cleanKey] =
+                    typeof row[key] === 'string' ? row[key].trim() : row[key];
                 });
                 return cleanedRow;
               });
@@ -51,11 +79,11 @@ const WordQuizApp = () => {
             setTotalDays(Math.ceil(cleanedData.length / 100));
             setIsLoading(false);
           },
-          error: (error) => {
-            console.error('CSV parsing error:', error);
+          error: (err) => {
+            console.error('CSV parsing error:', err);
             setError('CSV 파일을 읽는 중 오류가 발생했습니다.');
             setIsLoading(false);
-          }
+          },
         });
       } catch (err) {
         console.error('File reading error:', err);
@@ -67,7 +95,7 @@ const WordQuizApp = () => {
     loadCSV();
   }, []);
 
-  // 헷갈리는 단어 로드 (메모리에서)
+  /* ---------------------- 헷갈리는 단어 로드 ---------------------- */
   useEffect(() => {
     const saved = localStorage.getItem('confusingWords');
     if (saved) {
@@ -79,46 +107,53 @@ const WordQuizApp = () => {
     }
   }, []);
 
-  // 현재 일차의 단어들 가져오기
+  /* ---------------------- 현재 일차 단어 목록 ---------------------- */
   const getCurrentWords = () => {
+    // 헷갈리는 단어 모드일 때 그대로 반환
     if (showConfusing) return confusingWords;
-    
+
     const startIndex = (currentDay - 1) * 100;
     const endIndex = startIndex + 100;
-    return words.slice(startIndex, endIndex);
+    const dayWords = words.slice(startIndex, endIndex);
+
+    // 카드 모드(기본)에서는 렌더링마다 섞어주기
+    if (viewMode === 'card') {
+      return shuffleArray(dayWords);
+    }
+
+    // 외우기 모드(list)에서는 원래 순서를 유지
+    return dayWords;
   };
 
+  /* ---------------------- 메모된 현재 단어 ---------------------- */
   const currentWords = getCurrentWords();
   const currentWord = currentWords[currentIndex];
 
-  // 단어 키 추출 (첫 번째와 두 번째 컬럼 사용)
   const getWordKeys = () => {
     if (!currentWord) return { korean: '', english: '' };
-    
+
     const keys = Object.keys(currentWord);
     const korean = currentWord[keys[0]] || '';
     const english = currentWord[keys[1]] || '';
-    
+
     return { korean, english };
   };
 
   const { korean, english } = getWordKeys();
 
-  // 카드 뒤집기
+  /* -------------------------- 카드 뒤집기 -------------------------- */
   const flipCard = () => {
     setIsFlipped(!isFlipped);
   };
 
-  // 다음 단어
+  /* -------------------------- 다음 / 이전 단어 -------------------------- */
   const nextWord = () => {
     if (currentIndex < currentWords.length - 1) {
       setIsFlipped(false);
       setCurrentIndex(currentIndex + 1);
-
     }
   };
 
-  // 이전 단어
   const prevWord = () => {
     if (currentIndex > 0) {
       setIsFlipped(false);
@@ -126,14 +161,14 @@ const WordQuizApp = () => {
     }
   };
 
-  // 헷갈리는 단어에 추가
+  /* ---------------------- 헷갈리는 단어 추가/제거 ---------------------- */
   const addToConfusing = () => {
     if (!currentWord) return;
-    
-    const isAlreadyAdded = confusingWords.some(word => 
-      JSON.stringify(word) === JSON.stringify(currentWord)
+
+    const isAlreadyAdded = confusingWords.some(
+      (word) => JSON.stringify(word) === JSON.stringify(currentWord)
     );
-    
+
     if (!isAlreadyAdded) {
       const newConfusingWords = [...confusingWords, currentWord];
       setConfusingWords(newConfusingWords);
@@ -141,19 +176,20 @@ const WordQuizApp = () => {
     }
   };
 
-  // 헷갈리는 단어에서 제거
   const removeFromConfusing = () => {
-    const newConfusingWords = confusingWords.filter((_, index) => index !== currentIndex);
+    const newConfusingWords = confusingWords.filter(
+      (_, idx) => idx !== currentIndex
+    );
     setConfusingWords(newConfusingWords);
     localStorage.setItem('confusingWords', JSON.stringify(newConfusingWords));
-    
+
     if (currentIndex >= newConfusingWords.length && newConfusingWords.length > 0) {
       setCurrentIndex(newConfusingWords.length - 1);
     }
     setIsFlipped(false);
   };
 
-  // 일차 변경
+  /* ---------------------------- 기타 함수 ---------------------------- */
   const changeDay = (day) => {
     setCurrentDay(day);
     setCurrentIndex(0);
@@ -162,7 +198,6 @@ const WordQuizApp = () => {
     setHiddenAnswers(new Set());
   };
 
-  // 헷갈리는 단어 모드 토글
   const toggleConfusingMode = () => {
     setShowConfusing(!showConfusing);
     setCurrentIndex(0);
@@ -170,7 +205,6 @@ const WordQuizApp = () => {
     setHiddenAnswers(new Set());
   };
 
-  // 답 숨기기/보이기 토글
   const toggleAnswer = (index) => {
     const newHidden = new Set(hiddenAnswers);
     if (newHidden.has(index)) {
@@ -181,15 +215,15 @@ const WordQuizApp = () => {
     setHiddenAnswers(newHidden);
   };
 
-  // 모든 답 숨기기/보이기
   const toggleAllAnswers = () => {
     if (hiddenAnswers.size === currentWords.length) {
       setHiddenAnswers(new Set());
     } else {
-      setHiddenAnswers(new Set(Array.from({length: currentWords.length}, (_, i) => i)));
+      setHiddenAnswers(new Set(Array.from({ length: currentWords.length }, (_, i) => i)));
     }
   };
 
+  /* ---------------------------- 로딩 / 에러 ---------------------------- */
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
@@ -214,6 +248,7 @@ const WordQuizApp = () => {
     );
   }
 
+  /* ------------------------------ UI 렌더 ------------------------------ */
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 p-4">
       <div className="max-w-4xl mx-auto">
@@ -233,14 +268,16 @@ const WordQuizApp = () => {
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-indigo-600" />
               <span className="font-medium text-gray-700">일차:</span>
-              <select 
-                value={currentDay} 
+              <select
+                value={currentDay}
                 onChange={(e) => changeDay(Number(e.target.value))}
                 className="border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 disabled={showConfusing}
               >
-                {Array.from({length: totalDays}, (_, i) => (
-                  <option key={i + 1} value={i + 1}>{i + 1}일차</option>
+                {Array.from({ length: totalDays }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {i + 1}일차
+                  </option>
                 ))}
               </select>
             </div>
@@ -261,12 +298,16 @@ const WordQuizApp = () => {
               <button
                 onClick={() => setViewMode(viewMode === 'card' ? 'list' : 'card')}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                  viewMode === 'list' 
-                    ? 'bg-green-600 text-white hover:bg-green-700' 
+                  viewMode === 'list'
+                    ? 'bg-green-600 text-white hover:bg-green-700'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 }`}
               >
-                {viewMode === 'card' ? <List className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                {viewMode === 'card' ? (
+                  <List className="h-4 w-4" />
+                ) : (
+                  <CreditCard className="h-4 w-4" />
+                )}
                 {viewMode === 'card' ? '외우기 모드' : '카드 모드'}
               </button>
             </div>
@@ -275,8 +316,8 @@ const WordQuizApp = () => {
             <button
               onClick={toggleConfusingMode}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                showConfusing 
-                  ? 'bg-yellow-500 text-white hover:bg-yellow-600' 
+                showConfusing
+                  ? 'bg-yellow-500 text-white hover:bg-yellow-600'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
@@ -286,7 +327,7 @@ const WordQuizApp = () => {
           </div>
         </div>
 
-        {/* 진행률 - 카드 모드일 때만 표시 */}
+        {/* 진행률 - 카드 모드 */}
         {viewMode === 'card' && (
           <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
             <div className="flex justify-between items-center mb-2">
@@ -298,15 +339,15 @@ const WordQuizApp = () => {
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
+              <div
                 className="bg-gradient-to-r from-indigo-500 to-purple-600 h-2 rounded-full transition-all duration-300"
-                style={{width: `${((currentIndex + 1) / currentWords.length) * 100}%`}}
+                style={{ width: `${((currentIndex + 1) / currentWords.length) * 100}%` }}
               ></div>
             </div>
           </div>
         )}
 
-        {/* 외우기 모드 컨트롤 */}
+        {/* 외우기 모드 컨트롤 (리스트) */}
         {viewMode === 'list' && currentWords.length > 0 && (
           <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
             <div className="flex justify-between items-center">
@@ -317,27 +358,33 @@ const WordQuizApp = () => {
                 onClick={toggleAllAnswers}
                 className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors text-sm"
               >
-                {hiddenAnswers.size === currentWords.length ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                {hiddenAnswers.size === currentWords.length ? (
+                  <Eye className="h-4 w-4" />
+                ) : (
+                  <EyeOff className="h-4 w-4" />
+                )}
                 {hiddenAnswers.size === currentWords.length ? '모두 보기' : '모두 가리기'}
               </button>
             </div>
           </div>
         )}
 
-        {/* 메인 컨텐츠 */}
+        {/* -------------------------- 메인 컨텐츠 -------------------------- */}
         {viewMode === 'card' ? (
-          // 카드 모드
+          /* 카드 모드 */
           <>
             {currentWords.length > 0 ? (
               <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-                <div 
+                <div
                   className="relative h-64 cursor-pointer group"
                   onClick={flipCard}
                   key={`${currentIndex}-${currentDay}-${showConfusing}`}
                 >
-                  <div className={`absolute inset-0 transition-transform duration-500 transform-style-preserve-3d ${
-                    isFlipped ? 'rotate-y-180' : ''
-                  }`}>
+                  <div
+                    className={`absolute inset-0 transition-transform duration-500 transform-style-preserve-3d ${
+                      isFlipped ? 'rotate-y-180' : ''
+                    }`}
+                  >
                     {/* 앞면 */}
                     <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
                       <div className="text-center">
@@ -347,7 +394,7 @@ const WordQuizApp = () => {
                         <p className="text-indigo-200 text-sm">클릭해서 뒤집기</p>
                       </div>
                     </div>
-                    
+
                     {/* 뒷면 */}
                     <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center text-white">
                       <div className="text-center">
@@ -393,7 +440,7 @@ const WordQuizApp = () => {
             </div>
           </>
         ) : (
-          // 외우기 모드 (리스트)
+          /* 외우기 모드 (리스트) */
           <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
             {currentWords.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -402,10 +449,10 @@ const WordQuizApp = () => {
                   const koreanWord = word[keys[0]] || '';
                   const englishWord = word[keys[1]] || '';
                   const isHidden = hiddenAnswers.has(index);
-                  
+
                   return (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
                       onClick={() => toggleAnswer(index)}
                     >
@@ -438,7 +485,7 @@ const WordQuizApp = () => {
           </div>
         )}
 
-        {/* 액션 버튼 */}
+        {/* -------------------------- 액션 버튼 -------------------------- */}
         {viewMode === 'card' && (
           <div className="flex justify-center gap-4">
             {showConfusing ? (
