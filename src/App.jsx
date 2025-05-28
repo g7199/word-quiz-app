@@ -16,16 +16,14 @@ import {
 import Papa from 'papaparse';
 
 /**
- * WordQuizApp – 카드(Flash‑card) / 외우기(List) 모드를 지원하는 단어 학습 앱
- * 요구사항(2025‑05‑28):
- *  • 카드 모드(기본)는 같은 일차 내에서 단어를 무작위로 섞어 보여 주되,
- *    "클릭 시 단어가 바뀌어 보이는 문제"가 없도록 한 번만 셔플한다.
- *  • 외우기 모드 / 헷갈리는 단어 모드에서는 원본 순서를 유지한다.
+ * WordQuizApp – React + Tailwind 기반 단어 학습 앱
+ * 요구사항(2025-05-28)
+ *   • 카드 모드(기본): 같은 일차 내 단어를 한 번만 셔플.
+ *   • 리스트(외우기) 모드/헷갈리는 단어 모드: 원본 순서 유지.
+ *   • 카드 ↔ 리스트 토글 시에도 셔플 결과가 유지돼야 함.
  */
 const WordQuizApp = () => {
-  /* ------------------------------------------------------------------ */
-  /* 상태 */
-  /* ------------------------------------------------------------------ */
+  /*──────────────────────────────── 상태 */
   const [words, setWords] = useState([]);
   const [currentDay, setCurrentDay] = useState(1);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -39,41 +37,34 @@ const WordQuizApp = () => {
   const [viewMode, setViewMode] = useState('card'); // 'card' | 'list'
   const [hiddenAnswers, setHiddenAnswers] = useState(new Set());
 
-  /* ------------------------------------------------------------------ */
-  /* 유틸리티 – Fisher‑Yates Shuffle */
-  /* ------------------------------------------------------------------ */
-  const shuffleArray = (array) => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i -= 1) {
+  /*─────────────────────────────── 유틸: Fisher‑Yates */
+  const shuffleArray = (arr) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i -= 1) {
       const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      [a[i], a[j]] = [a[j], a[i]];
     }
-    return shuffled;
+    return a;
   };
 
-  /* ------------------------------------------------------------------ */
-  /* CSV 로드 */
-  /* ------------------------------------------------------------------ */
+  /*─────────────────────────────── CSV 로드 */
   useEffect(() => {
     const loadCSV = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch('/word.csv');
-        const csvText = await response.text();
+        const res = await fetch('/word.csv');
+        const text = await res.text();
 
-        Papa.parse(csvText, {
+        Papa.parse(text, {
           header: true,
           skipEmptyLines: true,
           dynamicTyping: true,
           delimitersToGuess: [',', '\t', '|', ';'],
           complete: ({ data, errors }) => {
-            if (errors.length > 0) console.warn('CSV parse warnings', errors);
+            if (errors.length) console.warn('CSV parse warnings', errors);
 
             const cleaned = data
-              .filter(
-                (row) =>
-                  row && Object.values(row).some((v) => v !== null && v !== '')
-              )
+              .filter((row) => row && Object.values(row).some((v) => v !== null && v !== ''))
               .map((row) => {
                 const obj = {};
                 Object.keys(row).forEach((k) => {
@@ -86,8 +77,8 @@ const WordQuizApp = () => {
             setTotalDays(Math.ceil(cleaned.length / 100));
             setIsLoading(false);
           },
-          error: (e) => {
-            console.error(e);
+          error: (err) => {
+            console.error(err);
             setError('CSV 파일을 읽는 중 오류가 발생했습니다.');
             setIsLoading(false);
           },
@@ -102,92 +93,73 @@ const WordQuizApp = () => {
     loadCSV();
   }, []);
 
-  /* ------------------------------------------------------------------ */
-  /* 로컬스토리지 – 헷갈리는 단어 */
-  /* ------------------------------------------------------------------ */
+  /*─────────────────────────────── 로컬스토리지 – 헷갈리는 단어 */
   useEffect(() => {
     const saved = localStorage.getItem('confusingWords');
     if (saved) {
       try {
         setConfusingWords(JSON.parse(saved));
       } catch (e) {
-        console.error('confusingWords load error', e);
+        console.error('confusingWords JSON error', e);
       }
     }
   }, []);
 
-  /* ------------------------------------------------------------------ */
-  /* 현재 일차 / 모드 별 단어 목록 (한 번만 셔플) */
-  /* ------------------------------------------------------------------ */
-  const currentWords = useMemo(() => {
-    // ① 헷갈리는 단어 모드
-    if (showConfusing) return confusingWords;
-
-    // ② 일차별 100개 추출
+  /*─────────────────────────────── 일차별 ordered/shuffled 캐싱 */
+  const daySlices = useMemo(() => {
     const start = (currentDay - 1) * 100;
-    const end = start + 100;
-    const dayWords = words.slice(start, end);
+    const ordered = words.slice(start, start + 100);
+    return {
+      ordered,
+      shuffled: shuffleArray(ordered),
+    };
+  }, [words, currentDay]); // viewMode 제외 → 카드✔리스트 토글해도 셔플 유지
 
-    // ③ 카드 모드일 때만 셔플 (한 번만)
-    return viewMode === 'card' ? shuffleArray(dayWords) : dayWords;
-  }, [words, currentDay, viewMode, showConfusing, confusingWords]);
+  /*─────────────────────────────── currentWords 계산 */
+  const currentWords = showConfusing
+    ? confusingWords
+    : viewMode === 'card'
+    ? daySlices.shuffled
+    : daySlices.ordered;
 
-  /* ------------------------------------------------------------------ */
-  /* 현재 단어 & 언어 키 */
-  /* ------------------------------------------------------------------ */
+  /*─────────────────────────────── 현재 단어 & 키 */
   const currentWord = currentWords[currentIndex];
   const { korean = '', english = '' } = useMemo(() => {
     if (!currentWord) return {};
-    const keys = Object.keys(currentWord);
-    return {
-      korean: currentWord[keys[0]] || '',
-      english: currentWord[keys[1]] || '',
-    };
+    const [kKey, eKey] = Object.keys(currentWord);
+    return { korean: currentWord[kKey] || '', english: currentWord[eKey] || '' };
   }, [currentWord]);
 
-  /* ------------------------------------------------------------------ */
-  /* 카드 뒤집기 / 이전 · 다음 */
-  /* ------------------------------------------------------------------ */
-  const flipCard = () => setIsFlipped((prev) => !prev);
+  /*─────────────────────────────── 핸들러 */
+  const flipCard = () => setIsFlipped((f) => !f);
   const prevWord = () => {
     if (currentIndex > 0) {
       setIsFlipped(false);
-      setCurrentIndex((idx) => idx - 1);
+      setCurrentIndex((i) => i - 1);
     }
   };
   const nextWord = () => {
     if (currentIndex < currentWords.length - 1) {
       setIsFlipped(false);
-      setCurrentIndex((idx) => idx + 1);
+      setCurrentIndex((i) => i + 1);
     }
   };
-
-  /* ------------------------------------------------------------------ */
-  /* 헷갈리는 단어 추가 / 제거 */
-  /* ------------------------------------------------------------------ */
   const addToConfusing = () => {
     if (!currentWord) return;
-    const exists = confusingWords.some(
-      (w) => JSON.stringify(w) === JSON.stringify(currentWord)
-    );
+    const exists = confusingWords.some((w) => JSON.stringify(w) === JSON.stringify(currentWord));
     if (!exists) {
       const updated = [...confusingWords, currentWord];
       setConfusingWords(updated);
       localStorage.setItem('confusingWords', JSON.stringify(updated));
     }
   };
-
   const removeFromConfusing = () => {
     const updated = confusingWords.filter((_, i) => i !== currentIndex);
     setConfusingWords(updated);
     localStorage.setItem('confusingWords', JSON.stringify(updated));
-    if (currentIndex >= updated.length && updated.length > 0) setCurrentIndex(updated.length - 1);
+    if (currentIndex >= updated.length && updated.length) setCurrentIndex(updated.length - 1);
     setIsFlipped(false);
   };
-
-  /* ------------------------------------------------------------------ */
-  /* 모드 / 일차 등 토글 */
-  /* ------------------------------------------------------------------ */
   const changeDay = (day) => {
     setCurrentDay(day);
     setCurrentIndex(0);
@@ -196,7 +168,7 @@ const WordQuizApp = () => {
     setHiddenAnswers(new Set());
   };
   const toggleConfusingMode = () => {
-    setShowConfusing((prev) => !prev);
+    setShowConfusing((p) => !p);
     setCurrentIndex(0);
     setIsFlipped(false);
     setHiddenAnswers(new Set());
@@ -212,10 +184,8 @@ const WordQuizApp = () => {
       : setHiddenAnswers(new Set(currentWords.map((_, i) => i)));
   };
 
-  /* ------------------------------------------------------------------ */
-  /* 로딩 / 에러 */
-  /* ------------------------------------------------------------------ */
-  if (isLoading) {
+  /*─────────────────────────────── 로딩 & 에러 */
+  if (isLoading)
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
@@ -224,19 +194,17 @@ const WordQuizApp = () => {
         </div>
       </div>
     );
-  }
-  if (error) {
+  if (error)
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <FileText className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">파일 로드 오류</h2>
           <p className="text-gray-600 mb-4">{error}</p>
-          <p className="text-sm text-gray-500">word.csv 파일을 업로드하고 페이지를 새로고침해주세요.</p>
+          <p className="text-sm text-gray-500">word.csv 파일을 업로드한 뒤 새로고침하세요.</p>
         </div>
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 p-4">
