@@ -49,6 +49,7 @@ const WordQuizApp = () => {
 
   /*─────────────────────────────── CSV 로드 */
   useEffect(() => {
+    document.title = "⚡️ GRE 단어 퀴즈 ";
     const loadCSV = async () => {
       try {
         setIsLoading(true);
